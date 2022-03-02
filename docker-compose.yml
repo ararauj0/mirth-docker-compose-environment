@@ -1,0 +1,76 @@
+version: '3.7'
+
+networks:
+  internal:
+    driver: bridge
+  external:
+    driver: bridge
+
+volumes:
+  mirth-logs:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${LOG}
+      o: bind
+  mirth-conf:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${LOG4J_CONF}
+      o: bind
+  mirth-appdata:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${APPDATA}
+      o: bind
+  database:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${DATABASE}
+      o: bind
+
+services:
+  mirth:
+    container_name: mirth
+    image: ${IMAGE_MIRTH}
+    restart: unless-stopped
+    platform: linux/amd64
+    user: root
+    environment:
+      TZ: '${TZ:-America/Sao_Paulo}'
+      DATABASE: postgres
+      DATABASE_URL: jdbc:postgresql://${MIRTH_DB_HOST}:${MIRTH_DB_PORT}/${MIRTH_DB_NAME}
+      DATABASE_MAX_CONNECTIONS: 20
+      DATABASE_USERNAME: ${MIRTH_DB_USERNAME}
+      DATABASE_PASSWORD: ${MIRTH_DB_PASSWORD}
+      VMOPTIONS: ${MIRTH_VMOPTIONS}
+    volumes:
+      - mirth-appdata:/opt/connect/appdata
+      - mirth-logs:/opt/connect/logs
+      - mirth-conf:/opt/connect/conf
+    ports:
+      - 8080:8080/tcp
+      - 8443:8443/tcp
+    networks:
+      - internal
+    depends_on:
+      - db
+
+  db:
+    container_name: db-mirth
+    image: ${IMAGE_POSTGRES}
+    restart: unless-stopped
+    platform: linux/amd64
+    environment:
+      - POSTGRES_USER=${MIRTH_DB_USERNAME}
+      - POSTGRES_PASSWORD=${MIRTH_DB_PASSWORD}
+      - POSTGRES_DB=${MIRTH_DB_NAME}
+    ports:
+      - 5432:5432/tcp
+    volumes:
+      - database:/var/lib/postgresql/data
+    networks:
+      - internal
